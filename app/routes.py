@@ -1,3 +1,8 @@
+import os
+from datetime import datetime
+
+import httpx
+from dotenv import load_dotenv
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -8,8 +13,12 @@ from app.schemas import CityBase, CityBaseCreate, CityUpdate, TemperatureBase, T
 
 router = APIRouter()
 
+load_dotenv()
 
-@router.get("/city/", response_model=list[CityBase])
+api_key = os.getenv("WEATHER_API_KEY")
+
+
+@router.get("/cities/", response_model=list[CityBase])
 async def get_cities(
         db: AsyncSession = Depends(get_db),
 ):
@@ -17,7 +26,7 @@ async def get_cities(
     return result.scalars().all()
 
 
-@router.get("/city/{city_id}", response_model=CityBase)
+@router.get("/cities/{city_id}", response_model=CityBase)
 async def get_city(
         city_id: int,
         db: AsyncSession = Depends(get_db),
@@ -32,7 +41,7 @@ async def get_city(
     return city
 
 
-@router.post("/city/", response_model=CityBase)
+@router.post("/cities/", response_model=CityBase)
 async def create_city(
         city_data: CityBaseCreate,
         db: AsyncSession = Depends(get_db),
@@ -47,7 +56,7 @@ async def create_city(
     return city
 
 
-@router.patch("/city/{city_id}")
+@router.patch("/cities/{city_id}")
 async def update_city(
         city_data: CityUpdate,
         city_id: int,
@@ -69,7 +78,7 @@ async def update_city(
     return {"detail": "City updated"}
 
 
-@router.delete("/city/{city_id}")
+@router.delete("/cities/{city_id}")
 async def delete_city(
         city_id: int,
         db: AsyncSession = Depends(get_db),
@@ -86,15 +95,21 @@ async def delete_city(
     return {"detail": "City deleted"}
 
 
-@router.get("/temperature/", response_model=list[TemperatureBase])
+@router.get("/temperatures/", response_model=list[TemperatureBase])
 async def get_temperature(
+        city_id: int | None = None,
         db: AsyncSession = Depends(get_db),
 ):
-    result = await db.execute(select(TemperatureModel))
+    query = select(TemperatureModel)
+
+    if city_id is not None:
+        query = query.where(TemperatureModel.city_id == city_id)
+
+    result = await db.execute(query)
     return result.scalars().all()
 
 
-@router.get("/temperature/{temperature_id}", response_model=TemperatureBase)
+@router.get("/temperatures/{temperature_id}", response_model=TemperatureBase)
 async def get_temperature_by_id(
         temperature_id: int,
         db: AsyncSession = Depends(get_db),
@@ -107,7 +122,7 @@ async def get_temperature_by_id(
     return temperature
 
 
-@router.post("/temperature/", response_model=TemperatureBase)
+@router.post("/temperatures/", response_model=TemperatureBase)
 async def create_temperature(
         temperature_data: TemperatureCreate,
         db: AsyncSession = Depends(get_db),
@@ -121,3 +136,28 @@ async def create_temperature(
     await db.commit()
     await db.refresh(temperature)
     return temperature
+
+
+@router.post("/temperatures/update/")
+async def update_temperature(
+    db: AsyncSession = Depends(get_db)
+):
+    result = await db.execute(select(CityModel))
+    cities = result.scalars().all()
+
+    async with httpx.AsyncClient() as client:
+        for city in cities:
+            url = f"http://api.weatherapi.com/v1/current.json?key={api_key}&q={city.name}"
+            response = await client.get(url)
+            data = response.json()
+            temperature = data["current"]["temp_c"]
+            temperature_record = TemperatureModel(
+                city_id=city.id,
+                date_time=datetime.utcnow(),
+                temperature=temperature,
+            )
+            db.add(temperature_record)
+
+    await db.commit()
+
+    return {"detail": "Temperature updated"}

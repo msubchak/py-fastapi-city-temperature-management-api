@@ -23,6 +23,13 @@ alembic upgrade head
 ```bash
 uvicorn main:app --reload
 ```
+### Environment Variables
+**create a .env file in the root directory of the project with your API keys**
+```bash
+WEATHER_API_KEY=your_weatherapi_key_here
+```
+
+
 ## 🗺️ API Endpoints
 
 ### Cities
@@ -35,8 +42,10 @@ uvicorn main:app --reload
 
 ### Temperatures
 
-| Method | Endpoint                  | Description                               |
-|--------|---------------------------|-------------------------------------------|
-| GET    | /temperatures             | Get all temperature records               |
-| GET    | /temperatures?city_id=    | Get temperature records for a specific city |
-| POST   | /temperatures/update      | Fetch and store temperature for all cities |
+| Method | Endpoint                 | Description                                               |
+|--------|--------------------------|-----------------------------------------------------------|
+| GET    | /temperatures/           | Get all temperature records; optional filter by `city_id` |
+| GET    | /temperatures/{id}       | Get a single temperature record by its ID                 |
+| POST   | /temperatures/           | Create a temperature record manually                      |
+| POST   | /temperatures/update/    | Fetch current temperature for all cities and save records |
+
