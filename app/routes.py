@@ -147,16 +147,19 @@ async def update_temperature(
 
     async with httpx.AsyncClient() as client:
         for city in cities:
-            url = f"http://api.weatherapi.com/v1/current.json?key={api_key}&q={city.name}"
-            response = await client.get(url)
-            data = response.json()
-            temperature = data["current"]["temp_c"]
-            temperature_record = TemperatureModel(
-                city_id=city.id,
-                date_time=datetime.utcnow(),
-                temperature=temperature,
-            )
-            db.add(temperature_record)
+            try:
+                url = f"http://api.weatherapi.com/v1/current.json?key={api_key}&q={city.name}"
+                response = await client.get(url)
+                data = response.json()
+                temperature = data["current"]["temp_c"]
+                temperature_record = TemperatureModel(
+                    city_id=city.id,
+                    date_time=datetime.utcnow(),
+                    temperature=temperature,
+                )
+                db.add(temperature_record)
+            except HTTPException as e:
+                print (f"error: {e}")
 
     await db.commit()
 
